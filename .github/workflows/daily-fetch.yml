@@ -2,8 +2,8 @@ name: Daily M3U Fetcher
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # تشغيل يوميًا الساعة 00:00 UTC
-  workflow_dispatch:  # السماح بالتشغيل يدويًا
+    - cron: '0 0 * * *'  # Run daily at 00:00 UTC
+  workflow_dispatch:  # Allow manual trigger
 
 jobs:
   fetch-m3u:
@@ -27,6 +27,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y google-chrome-stable
+
+      - name: Create logs and output directories
+        run: mkdir -p logs output
 
       - name: Run script
         run: python main.py
