@@ -2,12 +2,14 @@ name: Daily M3U Fetcher
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # Run daily at 00:00 UTC
-  workflow_dispatch:  # Allow manual trigger
+    - cron: '0 0 * * *'
+  workflow_dispatch:
 
 jobs:
   fetch-m3u:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -37,12 +39,12 @@ jobs:
       - name: Run script
         run: python main.py || echo "Script failed, check logs/errors.log"
 
-      - name: Commit and push M3U file
+      - name: Commit and push M3U file and logs
         run: |
           git config --global user.name 'GitHub Action'
           git config --global user.email 'action@github.com'
-          git add output/playlist.m3u || echo "No playlist.m3u to add"
-          git commit -m 'Update M3U link' || echo "No changes to commit"
+          git add output/playlist.m3u logs/errors.log || echo "No files to add"
+          git commit -m 'Update M3U link and logs' || echo "No changes to commit"
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
