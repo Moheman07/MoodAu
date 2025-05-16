@@ -8,17 +8,24 @@ import random
 import string
 import time
 import logging
+import os
 
-# إعداد السجلات
-logging.basicConfig(filename='logs/errors.log', level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
+# Create logs and output directories
+os.makedirs('logs', exist_ok=True)
+os.makedirs('output', exist_ok=True)
+
+# Set up logging
+logging.basicConfig(filename='logs/errors.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.debug("Starting script execution")  # Log start of script
 
 def generate_random_string(length):
-    """توليد سلسلة عشوائية من أحرف وأرقام"""
+    """Generate a random string of letters and digits"""
     characters = string.ascii_letters + string.digits
     return ''.join(random.choice(characters) for _ in range(length))
 
 def handle_popup(driver):
-    """التعامل مع النوافذ المنبثقة"""
+    """Handle pop-up windows"""
+    logging.debug("Checking for pop-ups")
     original_window = driver.current_window_handle
     for window_handle in driver.window_handles:
         if window_handle != original_window:
@@ -27,86 +34,74 @@ def handle_popup(driver):
     driver.switch_to.window(original_window)
 
 def main():
-    # إعداد المتصفح
+    # Set up browser
+    logging.debug("Setting up Chrome browser")
     options = webdriver.ChromeOptions()
-    options.add_argument('--headless')  # تشغيل بدون واجهة
+    options.add_argument('--headless')
     options.add_argument('--disable-gpu')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     
     try:
-        # المرحلة 1: إنشاء المستخدم
+        # Phase 1: Create user
+        logging.debug("Navigating to create.php")
         driver.get('https://moodtv.xyz/create.php')
         
-        # توليد اسم مستخدم وكلمة مرور
+        # Generate username and password
         username = f"user_{generate_random_string(8)}"
         password = generate_random_string(12)
+        logging.debug(f"Generated username: {username}, password: {password}")
         
-        # إدخال البيانات
+        # Enter credentials
+        logging.debug("Entering credentials")
         WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, 'username'))).send_keys(username)
         WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, 'password'))).send_keys(password)
-        driver.find_element(By.ID, 'get_user_button').click()  # زر "Get User"
+        driver.find_element(By.ID, 'get_user_button').click()
         
-        # المرحلة 2: التعامل مع الإعلانات (3 تكرارات)
-        for _ in range(3):
-            # انتظار عداد 20 ثانية
+        # Phase 2: Handle ads (3 iterations)
+        for i in range(3):
+            logging.debug(f"Ad iteration {i+1}")
             WebDriverWait(driver, 25).until(EC.element_to_be_clickable((By.ID, 'next_button')))
-            
-            # التعامل مع إعلان منبثق
             handle_popup(driver)
-            
-            # إغلاق فيديو (زر X)
             try:
-                driver.find_element(By.CLASS_NAME, 'close_video').click()
+                WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CLASS_NAME, 'close_video'))).click()
             except:
-                pass  # تجاهل إذا لم يظهر
-            
-            # النقر على زر Skip
+                logging.debug("No video close button found")
             WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, 'skip_button'))).click()
-            
-            # النقر على زر Next الأزرق
             driver.find_element(By.ID, 'next_button').click()
-            
-            # انتظار شريط التحميل (~5 ثواني)
             WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, 'next_button_second')))
-            
-            # النقر على زر Next الثاني
             driver.find_element(By.ID, 'next_button_second').click()
         
-        # المرحلة 3: صفحات المتابعة (3 تكرارات)
-        for _ in range(3):
-            # انتظار عداد 5 ثواني
+        # Phase 3: Handle continue pages (3 iterations)
+        for i in range(3):
+            logging.debug(f"Continue iteration {i+1}")
             WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, 'continue_button')))
-            # النقر على زر متابعة
             driver.find_element(By.ID, 'continue_button').click()
-            
-            # التعامل مع صفحة الإعلان الثابتة
-            try:
-                # العودة إلى الصفحة السابقة
-                driver.back()
-                # انتظار زر متابعة مرة أخرى
-                WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, 'continue_button')))
-                driver.find_element(By.ID, 'continue_button').click()
-            except:
-                logging.warning("فشل التعامل مع صفحة الإعلان الثابتة، يتم المتابعة")
+            driver.back()
+            WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, 'continue_button')))
+            driver.find_element(By.ID, 'continue_button').click()
         
-        # المرحلة 4: نسخ رابط M3U
+        # Phase 4: Copy M3U link
+        logging.debug("Copying M3U link")
         WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, 'copy_m3u_button'))).click()
         m3u_link = driver.find_element(By.ID, 'm3u_link').get_attribute('data-clipboard-text')
         
-        # حفظ الرابط في ملف
+        # Save link to file
+        logging.debug(f"Saving M3U link: {m3u_link}")
         with open('output/playlist.m3u', 'w') as f:
             f.write(m3u_link)
         
-        print(f"تم حفظ رابط M3U: {m3u_link}")
+        print(f"Saved M3U link: {m3u_link}")
     
     except Exception as e:
-        logging.error(f"خطأ: {str(e)}")
-        print(f"حدث خطأ، تحقق من logs/errors.log")
+        logging.error(f"Error: {str(e)}")
+        print(f"An error occurred, check logs/errors.log")
+        raise
     
     finally:
         driver.quit()
+        logging.debug("Browser closed")
 
 if __name__ == "__main__":
     main()
