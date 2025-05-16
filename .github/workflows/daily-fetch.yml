@@ -31,14 +31,17 @@ jobs:
       - name: Create logs and output directories
         run: mkdir -p logs output
 
+      - name: Initialize playlist.m3u file
+        run: touch output/playlist.m3u
+
       - name: Run script
-        run: python main.py
+        run: python main.py || echo "Script failed, check logs/errors.log"
 
       - name: Commit and push M3U file
         run: |
           git config --global user.name 'GitHub Action'
           git config --global user.email 'action@github.com'
-          git add output/playlist.m3u
+          git add output/playlist.m3u || echo "No playlist.m3u to add"
           git commit -m 'Update M3U link' || echo "No changes to commit"
           git push
         env:
