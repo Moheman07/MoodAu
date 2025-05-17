@@ -16,7 +16,7 @@ os.makedirs('output', exist_ok=True)
 
 # Set up logging
 logging.basicConfig(filename='logs/errors.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
-logging.debug("Starting script execution")  # Log start of script
+logging.debug("Starting script execution")
 
 def generate_random_string(length):
     """Generate a random string of letters and digits"""
@@ -53,7 +53,7 @@ def main():
         password = generate_random_string(12)
         logging.debug(f"Generated username: {username}, password: {password}")
         
-        # Enter credentials
+        # Enter credentials (Update IDs based on actual site)
         logging.debug("Entering credentials")
         WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, 'username'))).send_keys(username)
         WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, 'password'))).send_keys(password)
@@ -83,9 +83,48 @@ def main():
             driver.find_element(By.ID, 'continue_button').click()
         
         # Phase 4: Copy M3U link
-        logging.debug("Copying M3U link")
-        WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, 'copy_m3u_button'))).click()
-        m3u_link = driver.find_element(By.ID, 'm3u_link').get_attribute('data-clipboard-text')
+        logging.debug("Attempting to copy M3U link")
+        # Locate the "Copy M3U Link" button by its text
+        copy_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, "//*[contains(text(), 'Copy M3U Link')]"))
+        )
+        copy_button.click()
+        logging.debug("Clicked Copy M3U Link button")
+        time.sleep(2)  # Wait for clipboard action to complete
+        
+        # Try to extract M3U link
+        m3u_link = ""
+        try:
+            # Method 1: Extract from data-clipboard-text
+            m3u_link = copy_button.get_attribute('data-clipboard-text')
+            logging.debug(f"Extracted M3U link (data-clipboard-text): '{m3u_link}'")
+        except:
+            logging.debug("Failed to extract M3U link from data-clipboard-text")
+        
+        if not m3u_link:
+            try:
+                # Method 2: Check for a nearby input field or element containing the link
+                m3u_link_element = driver.find_element(By.XPATH, "//input[contains(@value, 'http')] | //*[contains(text(), 'http')]")
+                m3u_link = m3u_link_element.get_attribute('value') or m3u_link_element.text
+                logging.debug(f"Extracted M3U link (alternative method): '{m3u_link}'")
+            except:
+                logging.debug("Failed to extract M3U link from alternative method")
+        
+        if not m3u_link:
+            # Method 3: Fallback to constructing the link from host, username, password
+            logging.debug("Attempting to construct M3U link from page data")
+            try:
+                host = driver.find_element(By.XPATH, "//*[contains(text(), 'Host:')]").text.split("Host: ")[1].strip()
+                username = driver.find_element(By.XPATH, "//*[contains(text(), 'Username')]//following-sibling::*").text.strip()
+                password = driver.find_element(By.XPATH, "//*[contains(text(), 'Password')]//following-sibling::*").text.strip()
+                m3u_link = f"http://{username}:{password}@{host}/get.php?username={username}&password={password}&type=m3u"
+                logging.debug(f"Constructed M3U link: '{m3u_link}'")
+            except:
+                logging.error("Failed to construct M3U link from page data")
+        
+        if not m3u_link:
+            logging.error("M3U link is empty")
+            raise ValueError("Failed to extract or construct M3U link")
         
         # Save link to file
         logging.debug(f"Saving M3U link: {m3u_link}")
